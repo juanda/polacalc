@@ -44,6 +44,225 @@ La notación polaca inversa funciona así:
 - Presiona `+`
 - Resultado: `8`
 
+## Arquitectura y Funcionamiento
+
+### Máquina de Estados de Entrada
+
+La calculadora implementa una máquina de estados para gestionar la entrada de números y operaciones:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Reposo: Inicio
+
+    Reposo --> EntrandoNumero: Dígito (0-9)
+    Reposo --> EntrandoNumero: Decimal (.)
+    Reposo --> Reposo: ENTER (duplica X)
+    Reposo --> Reposo: Operador
+    Reposo --> Reposo: DROP/SWAP/C
+
+    EntrandoNumero --> EntrandoNumero: Dígito (0-9)
+    EntrandoNumero --> EntrandoNumero: Decimal (.)
+    EntrandoNumero --> EntrandoNumero: +/− (negar)
+    EntrandoNumero --> Reposo: ENTER (push)
+    EntrandoNumero --> Reposo: Operador (push y opera)
+    EntrandoNumero --> Reposo: C (cancela entrada)
+
+    state Reposo {
+        [*] --> MostrarPila
+        MostrarPila --> MostrarPila: Actualizar display
+    }
+
+    state EntrandoNumero {
+        [*] --> ConstruyendoBuffer
+        ConstruyendoBuffer --> ConstruyendoBuffer: Concatenar dígitos
+    }
+```
+
+### Flujo de Operaciones
+
+```mermaid
+flowchart TD
+    A[Usuario presiona tecla] --> B{Tipo de entrada}
+
+    B -->|Dígito 0-9| C[Agregar a buffer]
+    B -->|Decimal| D[Agregar punto decimal]
+    B -->|ENTER| E{¿Entrando número?}
+    B -->|Operador| F{¿Entrando número?}
+    B -->|Función| G[Ejecutar función]
+
+    C --> H[Actualizar display de entrada]
+    D --> H
+
+    E -->|Sí| I[Push buffer a pila]
+    E -->|No| J[Duplicar X en pila]
+    I --> K[Limpiar buffer]
+    J --> L[Actualizar display]
+    K --> L
+
+    F -->|Sí| M[Push buffer primero]
+    F -->|No| N[Usar valor actual]
+    M --> O[Ejecutar operación]
+    N --> O
+
+    O --> P{¿Hay suficientes<br/>operandos?}
+    P -->|Sí| Q[Pop dos valores]
+    P -->|No| R[Mostrar error]
+
+    Q --> S[Calcular resultado]
+    S --> T[Push resultado]
+    T --> L
+    R --> L
+
+    G --> U{Tipo función}
+    U -->|DROP| V[Pop un valor]
+    U -->|SWAP| W[Intercambiar X e Y]
+    U -->|CLEAR| X[Limpiar todo]
+    U -->|+/-| Y[Negar número]
+
+    V --> L
+    W --> L
+    X --> L
+    Y --> L
+
+    H --> L
+    L --> Z[Fin]
+```
+
+### Estructura de la Pila
+
+La calculadora mantiene una pila de 100 elementos y visualiza los 5 superiores:
+
+```mermaid
+graph TB
+    subgraph Display["Visualización (5 niveles)"]
+        T["Nivel 4 (T)"]
+        Z["Nivel 3 (Z)"]
+        Y["Nivel 2 (Y)"]
+        X["Nivel 1 (X)"]
+        Input["Entrada Actual"]
+    end
+
+    subgraph Stack["Pila Interna (Array 100)"]
+        S0["stack[99]"]
+        S1["..."]
+        S2["stack[stackPointer-1] → X"]
+        S3["stack[stackPointer-2] → Y"]
+        S4["stack[stackPointer-3] → Z"]
+        S5["stack[stackPointer-4] → T"]
+        S6["stack[0]"]
+    end
+
+    S2 -.-> X
+    S3 -.-> Y
+    S4 -.-> Z
+    S5 -.-> T
+```
+
+### Operaciones Aritméticas
+
+```mermaid
+sequenceDiagram
+    participant U as Usuario
+    participant I as Input Handler
+    participant S as Stack
+    participant O as Operator
+    participant D as Display
+
+    Note over U,D: Ejemplo: 5 + 3
+
+    U->>I: Presiona "5"
+    I->>D: Muestra "5" en entrada
+
+    U->>I: Presiona ENTER
+    I->>S: Push(5)
+    S->>D: Actualiza pila [5]
+
+    U->>I: Presiona "3"
+    I->>D: Muestra "3" en entrada
+
+    U->>I: Presiona "+"
+    I->>S: Push(3)
+    S->>D: Actualiza pila [5,3]
+
+    I->>O: Ejecutar suma
+    O->>S: b = Pop() → 3
+    O->>S: a = Pop() → 5
+    O->>O: resultado = 5 + 3 = 8
+    O->>S: Push(8)
+    S->>D: Actualiza pila [8]
+    D->>U: Muestra resultado: 8
+```
+
+### Ciclo de Vida de la PWA
+
+```mermaid
+stateDiagram-v2
+    [*] --> Cargando: Usuario abre app
+
+    Cargando --> Registrando: DOM cargado
+    Registrando --> Instalable: Service Worker OK
+    Registrando --> Error: Service Worker falla
+
+    Instalable --> Instalando: Usuario acepta instalación
+    Instalable --> EnLinea: Usuario continúa en navegador
+
+    Instalando --> Instalada: Instalación exitosa
+
+    Instalada --> Standalone: App abierta desde icono
+    EnLinea --> EnLinea: Navegando
+
+    Standalone --> Offline: Sin conexión
+    EnLinea --> Offline: Sin conexión
+
+    Offline --> Standalone: Conexión restaurada
+    Offline --> EnLinea: Conexión restaurada
+
+    Error --> Cargando: Recarga página
+```
+
+### Arquitectura de Componentes
+
+```mermaid
+graph LR
+    subgraph Frontend["Frontend (index.html)"]
+        UI[UI Components]
+        SD[Stack Display]
+        ID[Input Display]
+        BTN[Buttons]
+    end
+
+    subgraph Logic["Lógica (app.js)"]
+        RPN[RPNCalculator Class]
+        Stack[Stack Management]
+        Ops[Operations Handler]
+        KB[Keyboard Handler]
+    end
+
+    subgraph PWA["PWA Infrastructure"]
+        SW[Service Worker]
+        Cache[Cache Storage]
+        Manifest[Manifest.json]
+    end
+
+    UI --> RPN
+    SD --> RPN
+    ID --> RPN
+    BTN --> RPN
+
+    RPN --> Stack
+    RPN --> Ops
+    RPN --> KB
+
+    Stack -.-> SD
+    Stack -.-> ID
+
+    SW --> Cache
+    Manifest --> SW
+
+    BTN -.->|Events| Ops
+    KB -.->|Events| Ops
+```
+
 ## Tecnologías
 
 - HTML5
