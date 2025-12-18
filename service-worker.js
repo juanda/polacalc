@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rpn-calculator-v1';
+const CACHE_NAME = 'rpn-calculator-v2';
 const urlsToCache = [
   './',
   './index.html',
@@ -14,7 +14,8 @@ self.addEventListener('install', event => {
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('Cache abierto');
-        return cache.addAll(urlsToCache);
+        console.log('Caching recursos desde:', self.registration.scope);
+        return cache.addAll(urlsToCache.map(url => new URL(url, self.registration.scope).href));
       })
   );
   self.skipWaiting();
