@@ -295,9 +295,13 @@ class RPNCalculator {
         const statusEl = document.getElementById('pwa-status');
 
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./service-worker.js')
+            const basePath = document.querySelector('base')?.href || window.location.pathname.replace(/\/[^/]*$/, '/');
+            navigator.serviceWorker.register('./service-worker.js', {
+                scope: './'
+            })
                 .then(registration => {
                     console.log('Service Worker registrado:', registration);
+                    console.log('Scope:', registration.scope);
                     if (statusEl) statusEl.textContent = 'PWA lista para instalar';
                 })
                 .catch(error => {
